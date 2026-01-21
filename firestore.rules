@@ -1,0 +1,146 @@
+/**
+ * This ruleset enforces a strict user-ownership security model for the QuadraFácil application.
+ * It is designed for rapid prototyping, prioritizing strong authorization controls while maintaining
+ * flexibility in the data schema.
+ *
+ * Core Philosophy:
+ * The security model is centered around path-based ownership. There are two primary user roles,
+ * Proprietario (owner) and Cliente (client), each with their own top-level collection. A user's
+ * authenticated UID must match the document ID in the path (`/proprietarios/{userId}` or
+ * `/clientes/{userId}`) to gain access. This ensures that users can only ever access their own data.
+ *
+ * Data Structure:
+ * The data is organized into two main silos: `/proprietarios` and `/clientes`.
+ * All business-critical data, such as courts (`quadras`), reservations (`reservas`), and payments
+ * (`pagamentos_divididos`), is hierarchically nested under the specific proprietor who owns it.
+ * For example: `/proprietarios/{proprietarioId}/quadras/{quadraId}`. This structure makes
+ * ownership checks simple, performant, and unambiguous.
+ *
+ * Key Security Decisions:
+ * - Strict Segregation: Proprietarios and Clientes have completely separate data trees. Neither
+ *   can access the other's top-level documents.
+ * - No Public Listing: Listing all proprietors or all clients is explicitly disallowed to protect
+ *   user privacy and prevent data scraping.
+ * - Owner-Only Writes: All write operations (create, update, delete) on any document are
+ *   restricted to the document's owner, as determined by the path. For example, only the
+ *   proprietor with the matching UID can create or modify a `quadra` document under their path.
+ * - Relational Integrity: On document creation, rules enforce that internal ID fields (like `id`
+ *   on a `Proprietario` document or `proprietarioId` on a `Quadra` document) match the corresponding
+ *   ID from the document path. This prevents data inconsistency. These fields are immutable on update.
+ */
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ------------------------------------------------------------------------
+    // Helper Functions
+    // ------------------------------------------------------------------------
+
+    /**
+     * Returns true if the user is signed in.
+     */
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    /**
+     * Returns true if the user's UID matches the provided userId.
+     * This is the primary function for checking document ownership.
+     */
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    /**
+     * Returns true if the user is the owner and the document already exists.
+     * Used for all update and delete operations to prevent modifying non-existent data.
+     */
+    function isExistingOwner(userId) {
+      return isOwner(userId) && resource != null;
+    }
+
+    // ------------------------------------------------------------------------
+    // Proprietario Rules
+    // ------------------------------------------------------------------------
+
+    /**
+     * @description Controls access to Proprietario (owner) profile documents.
+     * @path /proprietarios/{proprietarioId}
+     * @allow (create) An authenticated user creating their own profile document.
+     * @deny (get) An authenticated user trying to read another proprietor's profile.
+     * @principle Restricts access to a user's own data tree and enforces self-creation.
+     */
+    match /proprietarios/{proprietarioId} {
+      allow get: if isOwner(proprietarioId);
+      allow list: if false;
+      allow create: if isOwner(proprietarioId) && request.resource.data.id == proprietarioId;
+      allow update: if isExistingOwner(proprietarioId) && request.resource.data.id == resource.data.id;
+      allow delete: if isExistingOwner(proprietarioId);
+    }
+
+    /**
+     * @description Controls access to Quadra (court) documents, which are owned by a Proprietario.
+     * @path /proprietarios/{proprietarioId}/quadras/{quadraId}
+     * @allow (create) The proprietor creating a new court document under their own profile.
+     * @deny (update) A different proprietor trying to modify this court.
+     * @principle Enforces hierarchical ownership; only the parent document owner can manage children.
+     */
+    match /proprietarios/{proprietarioId}/quadras/{quadraId} {
+      allow get: if isOwner(proprietarioId);
+      allow list: if isOwner(proprietarioId);
+      allow create: if isOwner(proprietarioId) && request.resource.data.proprietarioId == proprietarioId;
+      allow update: if isExistingOwner(proprietarioId) && request.resource.data.proprietarioId == resource.data.proprietarioId;
+      allow delete: if isExistingOwner(proprietarioId);
+    }
+
+    /**
+     * @description Controls access to Reserva (reservation) documents.
+     * @path /proprietarios/{proprietarioId}/quadras/{quadraId}/reservas/{reservaId}
+     * @allow (list) The proprietor listing all reservations for one of their courts.
+     * @deny (get) Any user other than the owning proprietor reading a reservation.
+     * @principle Enforces hierarchical ownership. Client access to reservations would need to be
+     *            managed through a trusted backend (e.g., Cloud Functions).
+     */
+    match /proprietarios/{proprietarioId}/quadras/{quadraId}/reservas/{reservaId} {
+      allow get: if isOwner(proprietarioId);
+      allow list: if isOwner(proprietarioId);
+      allow create: if isOwner(proprietarioId);
+      allow update: if isExistingOwner(proprietarioId);
+      allow delete: if isExistingOwner(proprietarioId);
+    }
+
+    /**
+     * @description Controls access to PagamentoDividido (split payment) documents.
+     * @path /proprietarios/{proprietarioId}/quadras/{quadraId}/reservas/{reservaId}/pagamentos_divididos/{pagamentoDivididoId}
+     * @allow (create) The proprietor creating a split payment record for a reservation.
+     * @deny (delete) Any user other than the owning proprietor deleting a payment record.
+     * @principle Enforces hierarchical ownership for financial records.
+     */
+    match /proprietarios/{proprietarioId}/quadras/{quadraId}/reservas/{reservaId}/pagamentos_divididos/{pagamentoDivididoId} {
+      allow get: if isOwner(proprietarioId);
+      allow list: if isOwner(proprietarioId);
+      allow create: if isOwner(proprietarioId);
+      allow update: if isExistingOwner(proprietarioId);
+      allow delete: if isExistingOwner(proprietarioId);
+    }
+
+    // ------------------------------------------------------------------------
+    // Cliente Rules
+    // ------------------------------------------------------------------------
+
+    /**
+     * @description Controls access to Cliente (client) profile documents.
+     * @path /clientes/{clienteId}
+     * @allow (create) An authenticated user creating their own client profile.
+     * @deny (list) Any user attempting to list all clients in the database.
+     * @principle Restricts access to a user's own data tree and enforces self-creation.
+     */
+    match /clientes/{clienteId} {
+      allow get: if isOwner(clienteId);
+      allow list: if false;
+      allow create: if isOwner(clienteId) && request.resource.data.id == clienteId;
+      allow update: if isExistingOwner(clienteId) && request.resource.data.id == resource.data.id;
+      allow delete: if isExistingOwner(clienteId);
+    }
+  }
+}

@@ -1,0 +1,317 @@
+{
+  "entities": {
+    "Proprietario": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Proprietario",
+      "type": "object",
+      "description": "Represents a QuadraFacil owner.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Proprietario entity."
+        },
+        "email": {
+          "type": "string",
+          "description": "Email address of the owner.",
+          "format": "email"
+        },
+        "nome": {
+          "type": "string",
+          "description": "Name of the owner."
+        },
+        "nomeEstabelecimento": {
+          "type": "string",
+          "description": "Name of the establishment."
+        },
+        "cidade": {
+          "type": "string",
+          "description": "City where the establishment is located."
+        },
+        "telefone": {
+          "type": "string",
+          "description": "Contact phone number of the owner."
+        },
+        "tipoPlano": {
+          "type": "string",
+          "description": "Type of subscription plan (e.g., monthly, annual)."
+        },
+        "quantidadeQuadras": {
+          "type": "number",
+          "description": "Number of quadras owned by the Proprietario."
+        }
+      },
+      "required": [
+        "id",
+        "email",
+        "nome",
+        "nomeEstabelecimento",
+        "cidade",
+        "telefone",
+        "tipoPlano",
+        "quantidadeQuadras"
+      ]
+    },
+    "Quadra": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Quadra",
+      "type": "object",
+      "description": "Represents a sport court available for rent.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Quadra entity."
+        },
+        "proprietarioId": {
+          "type": "string",
+          "description": "Reference to Proprietario. (Relationship: Proprietario 1:N Quadra)"
+        },
+        "nomeQuadra": {
+          "type": "string",
+          "description": "Name of the sport court."
+        },
+        "tipoEsporte": {
+          "type": "string",
+          "description": "Type of sport played on the court (e.g., soccer, tennis)."
+        },
+        "precoHora": {
+          "type": "number",
+          "description": "Hourly price for renting the court."
+        },
+        "disponibilidade": {
+          "type": "string",
+          "description": "Availability schedule for the court."
+        }
+      },
+      "required": [
+        "id",
+        "proprietarioId",
+        "nomeQuadra",
+        "tipoEsporte",
+        "precoHora",
+        "disponibilidade"
+      ]
+    },
+    "Cliente": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Cliente",
+      "type": "object",
+      "description": "Represents a client who rents the sport court.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Cliente entity."
+        },
+        "nome": {
+          "type": "string",
+          "description": "Name of the client."
+        },
+        "email": {
+          "type": "string",
+          "description": "Email address of the client.",
+          "format": "email"
+        },
+        "telefone": {
+          "type": "string",
+          "description": "Contact phone number of the client."
+        }
+      },
+      "required": [
+        "id",
+        "nome",
+        "email",
+        "telefone"
+      ]
+    },
+    "Reserva": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Reserva",
+      "type": "object",
+      "description": "Represents a reservation made for a sport court.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Reserva entity."
+        },
+        "quadraId": {
+          "type": "string",
+          "description": "Reference to Quadra. (Relationship: Quadra 1:N Reserva)"
+        },
+        "clienteId": {
+          "type": "string",
+          "description": "Reference to Cliente. (Relationship: Cliente 1:N Reserva)"
+        },
+        "dataHora": {
+          "type": "string",
+          "description": "Date and time of the reservation.",
+          "format": "date-time"
+        },
+        "status": {
+          "type": "string",
+          "description": "Status of the reservation (e.g., pending, paid, canceled)."
+        },
+        "tipoPagamento": {
+          "type": "string",
+          "description": "Type of payment (e.g., integral, dividido)."
+        }
+      },
+      "required": [
+        "id",
+        "quadraId",
+        "clienteId",
+        "dataHora",
+        "status",
+        "tipoPagamento"
+      ]
+    },
+    "PagamentoDividido": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "PagamentoDividido",
+      "type": "object",
+      "description": "Represents a split payment for a reservation.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the PagamentoDividido entity."
+        },
+        "reservaId": {
+          "type": "string",
+          "description": "Reference to Reserva. (Relationship: Reserva 1:N PagamentoDividido)"
+        },
+        "nomePagador": {
+          "type": "string",
+          "description": "Name of the payer."
+        },
+        "linkPagamento": {
+          "type": "string",
+          "description": "Payment link for the individual payer."
+        },
+        "statusPagamento": {
+          "type": "string",
+          "description": "Payment status (e.g., pending, paid)."
+        }
+      },
+      "required": [
+        "id",
+        "reservaId",
+        "nomePagador",
+        "linkPagamento",
+        "statusPagamento"
+      ]
+    }
+  },
+  "auth": {
+    "providers": [
+      "password",
+      "anonymous"
+    ]
+  },
+  "firestore": {
+    "structure": [
+      {
+        "path": "/proprietarios/{proprietarioId}",
+        "definition": {
+          "entityName": "Proprietario",
+          "schema": {
+            "$ref": "#/backend/entities/Proprietario"
+          },
+          "description": "Stores Proprietario data. Uses path-based ownership for security.",
+          "params": [
+            {
+              "name": "proprietarioId",
+              "description": "The unique identifier for the Proprietario."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/proprietarios/{proprietarioId}/quadras/{quadraId}",
+        "definition": {
+          "entityName": "Quadra",
+          "schema": {
+            "$ref": "#/backend/entities/Quadra"
+          },
+          "description": "Stores Quadra data, nested under Proprietario. Uses path-based ownership, where the proprietorId links to the Proprietario.",
+          "params": [
+            {
+              "name": "proprietarioId",
+              "description": "The unique identifier for the Proprietario."
+            },
+            {
+              "name": "quadraId",
+              "description": "The unique identifier for the Quadra."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/clientes/{clienteId}",
+        "definition": {
+          "entityName": "Cliente",
+          "schema": {
+            "$ref": "#/backend/entities/Cliente"
+          },
+          "description": "Stores Cliente data. Uses path-based ownership for security.",
+          "params": [
+            {
+              "name": "clienteId",
+              "description": "The unique identifier for the Cliente."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/proprietarios/{proprietarioId}/quadras/{quadraId}/reservas/{reservaId}",
+        "definition": {
+          "entityName": "Reserva",
+          "schema": {
+            "$ref": "#/backend/entities/Reserva"
+          },
+          "description": "Stores Reserva data, nested under Quadra and Proprietario. The structure enforces hierarchical ownership.",
+          "params": [
+            {
+              "name": "proprietarioId",
+              "description": "The unique identifier for the Proprietario."
+            },
+            {
+              "name": "quadraId",
+              "description": "The unique identifier for the Quadra."
+            },
+            {
+              "name": "reservaId",
+              "description": "The unique identifier for the Reserva."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/proprietarios/{proprietarioId}/quadras/{quadraId}/reservas/{reservaId}/pagamentos_divididos/{pagamentoDivididoId}",
+        "definition": {
+          "entityName": "PagamentoDividido",
+          "schema": {
+            "$ref": "#/backend/entities/PagamentoDividido"
+          },
+          "description": "Stores PagamentoDividido data, nested under Reserva, Quadra, and Proprietario. Enforces hierarchical ownership and supports secure management of split payments.",
+          "params": [
+            {
+              "name": "proprietarioId",
+              "description": "The unique identifier for the Proprietario."
+            },
+            {
+              "name": "quadraId",
+              "description": "The unique identifier for the Quadra."
+            },
+            {
+              "name": "reservaId",
+              "description": "The unique identifier for the Reserva."
+            },
+            {
+              "name": "pagamentoDivididoId",
+              "description": "The unique identifier for the PagamentoDividido."
+            }
+          ]
+        }
+      }
+    ],
+    "reasoning": "The Firestore structure is designed to support the QuadraFácil application, focusing on user registration, quadra management, reservations, and payments. The structure ensures authorization independence by using path-based ownership for private user data and denormalizing authorization data where needed. The design also facilitates secure list operations and enforces invariants for data integrity.\n\n-   **Proprietarios:** Proprietario data is stored under `/proprietarios/{proprietarioId}`. This path-based structure ensures that only the authenticated proprietor (or an admin role, if implemented) can access and modify their data. This structure supports QAPs because listing proprietors is generally not required. If it were, access would be restricted based on admin roles.\n-   **Quadras:** Quadras are stored under `/proprietarios/{proprietarioId}/quadras/{quadraId}`. This structure establishes clear ownership. Security rules can easily verify that the `request.auth.uid` matches the `proprietarioId` to ensure only the owner can manage the quadra. Since quadras are nested under the proprietor, listing quadras can be secured by checking the proprietor's ID against the authenticated user's ID.\n-   **Clientes:** Cliente data is stored under `/clientes/{clienteId}`. This is path-based ownership. This structure supports QAPs because listing clientes is generally not required. If it were, access would be restricted based on the cliente's id.\n-   **Reservas:** Reservations are stored under `/proprietarios/{proprietarioId}/quadras/{quadraId}/reservas/{reservaId}`. This nested structure maintains the relationship between Proprietarios, Quadras and Reservas. Security rules will validate that the quadra belongs to the proprietor, guaranteeing data integrity. For collaborative scenarios (PagamentoDividido), the Proprietario manages the Quadra and Reservas, and the links for individual payments are generated and tracked. This approach eliminates the need to use `get()` calls to validate ownership, thereby achieving authorization independence.\n-   **PagamentoDividido:** Split payments are stored under `/proprietarios/{proprietarioId}/quadras/{quadraId}/reservas/{reservaId}/pagamentos_divididos/{pagamentoDivididoId}`. This ensures that split payments are directly associated with a reservation and its quadra and owner. Security rules can easily validate that the pagamento belongs to the reserva, the quadra, and the proprietor, guaranteeing data integrity. This nested structure enforces a clear hierarchy and ownership, which simplifies security rules and facilitates secure data access."
+  }
+}
