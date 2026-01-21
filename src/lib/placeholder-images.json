@@ -1,3 +1,22 @@
 {
-  "placeholderImages": []
+  "placeholderImages": [
+    {
+      "id": "hero-sports-court",
+      "description": "A vibrant, empty sports court from an aerial perspective.",
+      "imageUrl": "https://images.unsplash.com/photo-1641138294059-8bbb8f809a54?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw4fHxzcG9ydHMlMjBjb3VydHxlbnwwfHx8fDE3Njg5MDYwMjB8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "sports court"
+    },
+    {
+      "id": "owner-avatar-1",
+      "description": "Avatar for a sports court owner.",
+      "imageUrl": "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw3fHxwZXJzb24lMjBwb3J0cmFpdHxlbnwwfHx8fDE3Njg5ODY5MDF8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "person portrait"
+    },
+    {
+      "id": "establishment-photo",
+      "description": "A photo of the exterior of a sports facility.",
+      "imageUrl": "https://images.unsplash.com/photo-1765605898805-86923208c52b?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw4fHxzcG9ydHMlMjBmYWNpbGl0eXxlbnwwfHx8fDE3Njg5OTQ3MjZ8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "sports facility"
+    }
+  ]
 }
