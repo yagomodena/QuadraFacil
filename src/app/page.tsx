@@ -86,7 +86,7 @@ export default function Home() {
                 Comece hoje mesmo com um plano simples e transparente. Sem taxas escondidas.
               </p>
             </div>
-            <div className="flex flex-col md:flex-row justify-center items-center gap-8">
+            <div className="flex flex-col items-center gap-8 md:flex-row md:justify-center md:items-start">
               <PricingCard
                 plan="Mensal"
                 price="49,90"
@@ -135,7 +135,7 @@ export default function Home() {
 function FeatureCard({ icon, title, description }: { icon: React.ReactNode; title: string; description: string }) {
   return (
     <div className="grid gap-2 text-center md:text-left md:flex md:items-start md:gap-4">
-      <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
+      <div className="mx-auto flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-primary/10 md:mx-0">
         {icon}
       </div>
       <div className="grid gap-1">
