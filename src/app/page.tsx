@@ -30,7 +30,7 @@ export default function Home() {
               priority
             />
           )}
-          <div className="container relative z-20 flex flex-col items-center gap-6">
+          <div className="container relative z-20 flex flex-col items-center gap-6 px-4">
             <h1 className="font-headline text-4xl font-extrabold tracking-tight md:text-5xl lg:text-6xl">
               A gestão da sua quadra, elevada a outro nível.
             </h1>
@@ -50,12 +50,12 @@ export default function Home() {
         
         {/* How it works */}
         <section className="w-full py-16 md:py-24">
-            <div className="container">
+            <div className="container mx-auto px-4">
                 <div className="flex flex-col items-center justify-center space-y-4 text-center mb-12">
                     <div className="inline-block rounded-lg bg-secondary px-3 py-1 text-sm text-secondary-foreground">Como Funciona</div>
                     <h2 className="font-headline text-3xl font-bold tracking-tighter sm:text-5xl">Simples de começar. Fácil de gerenciar.</h2>
                 </div>
-                <div className="mx-auto grid gap-12 md:grid-cols-3">
+                <div className="grid gap-12 md:grid-cols-3">
                     <HowItWorksStep number="1" title="Cadastre-se" description="Crie sua conta em minutos e cadastre os dados do seu estabelecimento e suas quadras." />
                     <HowItWorksStep number="2" title="Configure" description="Defina seus horários de funcionamento, preços, e regras de agendamento e pagamento." />
                     <HowItWorksStep number="3" title="Divulgue e Gerencie" description="Compartilhe seu link de agendamento e gerencie todas as reservas em um painel centralizado." />
@@ -65,7 +65,7 @@ export default function Home() {
 
         {/* Features Section */}
         <section id="features" className="w-full py-16 md:py-24 bg-card border-y">
-          <div className="container">
+          <div className="container mx-auto px-4">
             <div className="flex flex-col items-center justify-center space-y-4 text-center mb-12">
               <div className="inline-block rounded-lg bg-primary/10 px-3 py-1 text-sm text-primary">Recursos Principais</div>
               <h2 className="font-headline text-3xl font-bold tracking-tighter sm:text-5xl">Tudo que você precisa para decolar</h2>
@@ -73,7 +73,7 @@ export default function Home() {
                 Nossa plataforma foi pensada para resolver os principais desafios dos proprietários de quadras esportivas.
               </p>
             </div>
-            <div className="mx-auto grid items-start gap-8 sm:max-w-4xl sm:grid-cols-2 lg:max-w-5xl lg:grid-cols-4">
+            <div className="grid items-start gap-8 sm:grid-cols-2 lg:grid-cols-4">
               <FeatureCard
                 icon={<CalendarClock className="h-8 w-8 text-primary" />}
                 title="Agenda Inteligente"
@@ -100,11 +100,11 @@ export default function Home() {
         
         {/* Testimonials */}
         <section className="w-full py-16 md:py-24">
-            <div className="container">
+            <div className="container mx-auto px-4">
                 <div className="flex flex-col items-center justify-center space-y-4 text-center mb-12">
                      <h2 className="font-headline text-3xl font-bold tracking-tighter sm:text-5xl">Amado por proprietários em todo o Brasil</h2>
                 </div>
-                <div className="mx-auto grid gap-8 md:grid-cols-2 lg:max-w-5xl">
+                <div className="grid gap-8 md:grid-cols-2">
                     <TestimonialCard 
                         avatar={testimonialAvatar1}
                         name="Camila Borges"
@@ -124,10 +124,10 @@ export default function Home() {
 
         {/* Pricing Section */}
         <section className="w-full py-16 md:py-24 bg-card border-y">
-          <div className="container">
+          <div className="container mx-auto px-4">
             <div className="flex flex-col items-center justify-center space-y-4 text-center mb-12">
               <h2 className="font-headline text-3xl font-bold tracking-tighter sm:text-5xl">Um preço que cabe no seu negócio</h2>
-              <p className="max-w-[900px] text-muted-foreground md:text-xl/relaxed">
+              <p className="max-w-3xl text-muted-foreground md:text-xl/relaxed">
                 Comece hoje mesmo com um plano simples e transparente. Sem taxas escondidas.
               </p>
             </div>
@@ -166,9 +166,9 @@ export default function Home() {
         
         {/* Final CTA */}
         <section className="w-full py-16 md:py-24">
-            <div className="container text-center flex flex-col items-center gap-4">
+            <div className="container mx-auto px-4 text-center flex flex-col items-center gap-4">
                  <h2 className="font-headline text-3xl font-bold tracking-tighter sm:text-4xl">Pronto para simplificar a gestão da sua quadra?</h2>
-                 <p className="max-w-xl mx-auto text-muted-foreground md:text-lg">
+                 <p className="max-w-2xl mx-auto text-muted-foreground md:text-lg">
                     Junte-se a centenas de proprietários que já estão economizando tempo e aumentando seu faturamento.
                  </p>
                  <Button asChild size="lg" className="mt-4">
