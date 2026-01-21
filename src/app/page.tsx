@@ -64,7 +64,7 @@ export default function Home() {
         </section>
 
         {/* Features Section */}
-        <section id="features" className="w-full py-16 md:py-24 bg-card border-y">
+        <section id="features" className="w-full py-16 md:py-24 bg-muted border-y">
           <div className="container mx-auto px-4">
             <div className="flex flex-col items-center justify-center space-y-4 text-center mb-12">
               <div className="inline-block rounded-lg bg-primary/10 px-3 py-1 text-sm text-primary">Recursos Principais</div>
@@ -123,7 +123,7 @@ export default function Home() {
 
 
         {/* Pricing Section */}
-        <section className="w-full py-16 md:py-24 bg-card border-y">
+        <section className="w-full py-16 md:py-24 bg-muted border-y">
           <div className="container mx-auto px-4">
             <div className="flex flex-col items-center justify-center space-y-4 text-center mb-12">
               <h2 className="font-headline text-3xl font-bold tracking-tighter sm:text-5xl">Um preço que cabe no seu negócio</h2>
@@ -211,7 +211,7 @@ function FeatureCard({ icon, title, description }: { icon: React.ReactNode; titl
 
 function TestimonialCard({ avatar, name, location, testimonial }: { avatar: any; name: string; location: string; testimonial: string; }) {
     return (
-        <Card className="bg-background">
+        <Card>
             <CardContent className="p-6">
                 <div className="flex items-center gap-4 mb-4">
                     <Avatar>
