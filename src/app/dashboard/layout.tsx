@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { doc } from 'firebase/firestore';
 import { useAuth, useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
@@ -32,6 +32,7 @@ export default function DashboardLayout({
 }) {
   const auth = useAuth();
   const router = useRouter();
+  const pathname = usePathname();
   const firestore = useFirestore();
   const { user, isUserLoading } = useUser();
   const userAvatar = PlaceHolderImages.find(p => p.id === 'owner-avatar-1');
@@ -61,6 +62,14 @@ export default function DashboardLayout({
     );
   }
 
+  const menuItems = [
+    { href: "/dashboard", label: "Dashboard", icon: Home },
+    { href: "/dashboard/agenda", label: "Agenda", icon: Calendar },
+    { href: "/dashboard/quadras", label: "Minhas Quadras", icon: Shield },
+    { href: "/dashboard/financeiro", label: "Financeiro", icon: DollarSign },
+    { href: "/dashboard/configuracoes", label: "Configurações", icon: Settings },
+  ];
+
   return (
     <SidebarProvider>
       <Sidebar>
@@ -72,31 +81,13 @@ export default function DashboardLayout({
         </SidebarHeader>
         <SidebarContent>
           <SidebarMenu>
-            <SidebarMenuItem>
-              <SidebarMenuButton asChild isActive>
-                <Link href="/dashboard"><Home /> Dashboard</Link>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-            <SidebarMenuItem>
-              <SidebarMenuButton asChild>
-                <Link href="#"><Calendar /> Agenda</Link>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-            <SidebarMenuItem>
-              <SidebarMenuButton asChild>
-                <Link href="#"><Shield /> Minhas Quadras</Link>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-            <SidebarMenuItem>
-              <SidebarMenuButton asChild>
-                <Link href="#"><DollarSign /> Financeiro</Link>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-            <SidebarMenuItem>
-              <SidebarMenuButton asChild>
-                <Link href="#"><Settings /> Configurações</Link>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
+            {menuItems.map((item) => (
+                <SidebarMenuItem key={item.href}>
+                <SidebarMenuButton asChild isActive={pathname === item.href}>
+                    <Link href={item.href}><item.icon /> {item.label}</Link>
+                </SidebarMenuButton>
+                </SidebarMenuItem>
+            ))}
           </SidebarMenu>
         </SidebarContent>
         <SidebarFooter>
