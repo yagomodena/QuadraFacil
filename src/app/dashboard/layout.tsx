@@ -1,3 +1,11 @@
+'use client';
+
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import Link from 'next/link';
+import { doc } from 'firebase/firestore';
+import { useAuth, useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
+import { Proprietario } from '@/lib/types';
 import {
   SidebarProvider,
   Sidebar,
@@ -14,15 +22,44 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Icons } from "@/components/icons";
 import { Home, Calendar, Shield, DollarSign, Settings, LogOut } from "lucide-react";
-import Link from 'next/link';
 import { PlaceHolderImages } from "@/lib/placeholder-images";
+import { Skeleton } from '@/components/ui/skeleton';
 
 export default function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const auth = useAuth();
+  const router = useRouter();
+  const firestore = useFirestore();
+  const { user, isUserLoading } = useUser();
   const userAvatar = PlaceHolderImages.find(p => p.id === 'owner-avatar-1');
+  
+  const proprietarioRef = useMemoFirebase(
+    () => (user ? doc(firestore, 'proprietarios', user.uid) : null),
+    [firestore, user]
+  );
+  const { data: proprietario, isLoading: isProprietarioLoading } = useDoc<Proprietario>(proprietarioRef);
+
+  useEffect(() => {
+    if (!isUserLoading && !user) {
+      router.push('/login');
+    }
+  }, [user, isUserLoading, router]);
+
+  const handleLogout = async () => {
+    await auth.signOut();
+    router.push('/');
+  };
+
+  if (isUserLoading || !user) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <Icons.logo className="size-12 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <SidebarProvider>
@@ -66,14 +103,23 @@ export default function DashboardLayout({
           <div className="flex items-center gap-3 p-2 border-t">
             <Avatar className="size-9">
               {userAvatar && <AvatarImage src={userAvatar.imageUrl} alt="Avatar do proprietário" />}
-              <AvatarFallback>JD</AvatarFallback>
+              <AvatarFallback>{proprietario?.nome?.[0]}</AvatarFallback>
             </Avatar>
             <div className="flex flex-col overflow-hidden">
-              <span className="text-sm font-semibold truncate">João da Silva</span>
-              <span className="text-xs text-muted-foreground truncate">Arena Esportiva</span>
+            {isProprietarioLoading ? (
+                <div className="space-y-1">
+                    <Skeleton className="h-4 w-24" />
+                    <Skeleton className="h-3 w-20" />
+                </div>
+            ) : (
+                <>
+                    <span className="text-sm font-semibold truncate">{proprietario?.nome}</span>
+                    <span className="text-xs text-muted-foreground truncate">{proprietario?.nomeEstabelecimento}</span>
+                </>
+            )}
             </div>
-             <Button variant="ghost" size="icon" className="ml-auto" asChild>
-                <Link href="/"><LogOut /></Link>
+             <Button variant="ghost" size="icon" className="ml-auto" onClick={handleLogout}>
+                <LogOut />
              </Button>
           </div>
         </SidebarFooter>
