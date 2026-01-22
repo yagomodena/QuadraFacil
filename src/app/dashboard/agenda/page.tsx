@@ -77,7 +77,7 @@ export default function AgendaPage() {
         </div>
       </div>
 
-      <div className="grid gap-6 xl:grid-cols-[280px_1fr]">
+      <div className="grid gap-6 lg:grid-cols-[280px_1fr]">
         <div className="space-y-6">
           <Card className="border-border/60 bg-background/80">
             <CardContent className="p-0">
