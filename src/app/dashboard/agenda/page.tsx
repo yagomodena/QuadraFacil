@@ -2,7 +2,7 @@
 
 import { useMemo, useState, useEffect } from 'react';
 import { Calendar as CalendarIcon, ChevronLeft, ChevronRight } from 'lucide-react';
-import { format, startOfWeek, endOfWeek, eachDayOfInterval, addDays, subDays, isSameDay } from 'date-fns';
+import { format, startOfWeek, endOfWeek, eachDayOfInterval, addDays, subDays, isSameDay, isBefore, startOfToday } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -246,6 +246,14 @@ export default function AgendaPage() {
   };
 
   const handleNewBookingClick = (day: Date, hour: string) => {
+    if (isBefore(day, startOfToday())) {
+        toast({
+            variant: "destructive",
+            title: "Data Inválida",
+            description: "Não é possível criar agendamentos em datas passadas.",
+        });
+        return;
+    }
     setSelectedSlot({ date: day, time: hour });
     setNewBookingDialogOpen(true);
   }
@@ -334,6 +342,7 @@ export default function AgendaPage() {
                     <div className="flex items-center justify-center px-4 py-6 text-sm text-muted-foreground">{hour}</div>
                     {week.days.map((day) => {
                       const booking = findBooking(hour, day);
+                      const isPast = isBefore(day, startOfToday());
                       return (
                         <div key={day.toISOString()} className="px-2 py-2 border-l border-border/60">
                           {booking ? (
@@ -357,9 +366,15 @@ export default function AgendaPage() {
                           ) : (
                             <button
                                 onClick={() => handleNewBookingClick(day, hour)}
-                                className="h-full w-full rounded-2xl border border-dashed border-border/60 bg-muted/20 px-4 py-3 text-xs text-muted-foreground flex items-center justify-center hover:bg-primary/5 hover:border-primary/40 transition-colors"
+                                disabled={isPast}
+                                className={cn(
+                                    "h-full w-full rounded-2xl border border-dashed border-border/60 px-4 py-3 text-xs text-muted-foreground flex items-center justify-center transition-colors",
+                                    isPast 
+                                    ? "bg-muted/30 cursor-not-allowed" 
+                                    : "bg-muted/20 hover:bg-primary/5 hover:border-primary/40"
+                                )}
                             >
-                              Disponível
+                              {isPast ? "Passado" : "Disponível"}
                             </button>
                           )}
                         </div>
