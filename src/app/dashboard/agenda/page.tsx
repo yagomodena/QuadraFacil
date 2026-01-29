@@ -5,6 +5,7 @@ import { Calendar } from '@/components/ui/calendar';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
+import { buttonVariants } from '@/components/ui/button';
 
 export default function AgendaPage() {
   const [date, setDate] = useState<Date | undefined>(new Date());
@@ -80,6 +81,11 @@ export default function AgendaPage() {
       <div className="grid gap-6 lg:grid-cols-[280px_1fr]">
         <div className="space-y-6">
           <Card className="border-border/60 bg-background/80">
+            <CardHeader className="border-b border-border/60">
+              <CardTitle className="text-sm uppercase tracking-[0.2em] text-muted-foreground">
+                Calendário
+              </CardTitle>
+            </CardHeader>
             <CardContent className="p-0">
               <Calendar
                 mode="single"
@@ -87,9 +93,13 @@ export default function AgendaPage() {
                 onSelect={setDate}
                 className="rounded-md"
                 classNames={{
+                  day: cn(
+                    buttonVariants({ variant: "ghost" }),
+                    "h-9 w-9 p-0 font-normal aria-selected:opacity-100 rounded-full"
+                  ),
                   day_selected:
                     'bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground focus:bg-primary focus:text-primary-foreground',
-                  day_today: 'bg-accent text-accent-foreground',
+                  day_today: 'bg-muted text-foreground font-semibold',
                 }}
               />
             </CardContent>
