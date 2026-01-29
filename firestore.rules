@@ -99,9 +99,9 @@ service cloud.firestore {
       // Allow proprietor to read all their reservations.
       // Allow client to read their own reservations.
       allow get: if isOwner(resource.data.proprietarioId) || isOwner(resource.data.clienteId);
-      // Allow proprietors to list all reservations within their domain.
-      // A collection group query by a client is not secure here without further checks.
-      allow list: if isOwner(request.query.get("where")[0][2]);
+      // Allow anyone to list reservations as long as they are filtering by a specific proprietor.
+      // This is needed for the public booking page to show availability.
+      allow list: if request.query.get("where")[0][0] == 'proprietarioId' && request.query.get("where")[0][1] == '==';
     }
 
     /**
