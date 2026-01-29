@@ -61,6 +61,23 @@ export function useCollection<T = any>(
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<FirestoreError | Error | null>(null);
 
+  function isValidFirestoreTarget(
+    target: CollectionReference | Query
+  ): boolean {
+    try {
+      if ((target as CollectionReference).path === '') return false;
+  
+      // Proteção extra contra queries que caem na raiz
+      const path =
+        (target as any)._query?.path?.canonicalString?.() ??
+        (target as any).path;
+  
+      return typeof path === 'string' && path.length > 0 && path !== '/';
+    } catch {
+      return false;
+    }
+  }
+  
   useEffect(() => {
     if (!memoizedTargetRefOrQuery) {
       setData(null);
@@ -71,6 +88,12 @@ export function useCollection<T = any>(
 
     setIsLoading(true);
     setError(null);
+
+    if (!isValidFirestoreTarget(memoizedTargetRefOrQuery)) {
+      setIsLoading(false);
+      setError(null);
+      return;
+    }    
 
     // Directly use memoizedTargetRefOrQuery as it's assumed to be the final query
     const unsubscribe = onSnapshot(
