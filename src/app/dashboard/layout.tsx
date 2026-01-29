@@ -21,7 +21,7 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Icons } from "@/components/icons";
-import { Home, Calendar, Shield, DollarSign, Settings, LogOut } from "lucide-react";
+import { Home, Calendar, Shield, DollarSign, Settings, LogOut, Users } from "lucide-react";
 import { PlaceHolderImages } from "@/lib/placeholder-images";
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -66,6 +66,7 @@ export default function DashboardLayout({
     { href: "/dashboard", label: "Dashboard", icon: Home },
     { href: "/dashboard/agenda", label: "Agenda", icon: Calendar },
     { href: "/dashboard/quadras", label: "Minhas Quadras", icon: Shield },
+    { href: "/dashboard/clientes", label: "Clientes", icon: Users },
     { href: "/dashboard/financeiro", label: "Financeiro", icon: DollarSign },
     { href: "/dashboard/configuracoes", label: "Configurações", icon: Settings },
   ];
