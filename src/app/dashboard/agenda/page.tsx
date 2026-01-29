@@ -1,12 +1,13 @@
 'use client';
 
 import { useMemo, useState, useEffect } from 'react';
-import { Calendar as CalendarIcon, ChevronLeft, ChevronRight } from 'lucide-react';
-import { format, startOfWeek, endOfWeek, eachDayOfInterval, addDays, subDays, isSameDay, isBefore, startOfToday } from 'date-fns';
+import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
+import { format, startOfWeek, endOfWeek, eachDayOfInterval, addDays, subDays, isSameDay, isBefore, startOfToday, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
+import { collection, collectionGroup, query, where } from 'firebase/firestore';
 
 import { Calendar } from '@/components/ui/calendar';
 import { Card, CardContent } from '@/components/ui/card';
@@ -40,34 +41,18 @@ import {
 } from "@/components/ui/select"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { useToast } from '@/hooks/use-toast';
+import { useUser, useFirestore, useCollection, useMemoFirebase, addDocumentNonBlocking } from '@/firebase';
+import { Quadra, Reserva } from '@/lib/types';
 
-const today = new Date();
-const startOfThisWeek = startOfWeek(today, { locale: ptBR });
-
-const initialBookings = [
-    { date: startOfThisWeek, time: '08:00', court: 'Quadra 1', client: 'Fute da Manha', status: 'pago', tone: 'emerald' },
-    { date: addDays(startOfThisWeek, 1), time: '09:00', court: 'Quadra 2', client: 'Treino Juvenil', status: 'pendente', tone: 'amber' },
-    { date: addDays(startOfThisWeek, 2), time: '11:00', court: 'Quadra 3', client: 'Partida Amadora', status: 'pago', tone: 'sky' },
-    { date: addDays(startOfThisWeek, 2), time: '14:00', court: 'Quadra 1', client: 'Grupo do Fute', status: 'pago', tone: 'rose' },
-    { date: addDays(startOfThisWeek, 3), time: '16:00', court: 'Quadra 4', client: 'Liga Noturna', status: 'pago', tone: 'violet' },
-    { date: addDays(startOfThisWeek, 4), time: '19:00', court: 'Quadra 2', client: 'Amigos do Volei', status: 'pendente', tone: 'amber' },
-    { date: addDays(startOfThisWeek, 5), time: '10:00', court: 'Quadra 1', client: 'Fute de Sabado', status: 'pago', tone: 'emerald' },
-];
 
 const bookingFormSchema = z.object({
   client: z.string().min(1, "O nome do cliente é obrigatório."),
   court: z.string().min(1, "A quadra é obrigatória."),
-  status: z.enum(["pago", "pendente"]),
+  status: z.enum(["pago", "pendente", "cancelado"]),
 });
 
 type BookingFormValues = z.infer<typeof bookingFormSchema>;
 
-const quadras = [
-    { id: 'Q1', nome: 'Quadra 1 (Futebol)' },
-    { id: 'Q2', nome: 'Quadra 2 (Futebol)' },
-    { id: 'Q3', nome: 'Quadra de Vôlei' },
-    { id: 'Q4', nome: 'Quadra de Tênis' },
-];
 
 const toneStyles: Record<string, string> = {
     emerald: 'bg-emerald-500/10 border-emerald-500/30 text-emerald-800',
@@ -77,24 +62,21 @@ const toneStyles: Record<string, string> = {
     violet: 'bg-violet-500/10 border-violet-500/30 text-violet-800',
 };
 
-const courtTones: Record<string, string> = {
-    'Quadra 1 (Futebol)': 'emerald',
-    'Quadra 2 (Futebol)': 'sky',
-    'Quadra de Vôlei': 'rose',
-    'Quadra de Tênis': 'violet',
-}
-
 
 function NewBookingDialog({
   isOpen,
   onOpenChange,
   selectedSlot,
-  onSubmitBooking
+  onSubmitBooking,
+  quadras,
+  isSubmitting,
 }: {
   isOpen: boolean,
   onOpenChange: (isOpen: boolean) => void,
   selectedSlot: { date: Date, time: string } | null,
-  onSubmitBooking: (data: BookingFormValues) => void
+  onSubmitBooking: (data: BookingFormValues) => void,
+  quadras: Quadra[],
+  isSubmitting: boolean
 }) {
   const form = useForm<BookingFormValues>({
     resolver: zodResolver(bookingFormSchema),
@@ -115,7 +97,6 @@ function NewBookingDialog({
 
   const handleSubmit = (data: BookingFormValues) => {
     onSubmitBooking(data);
-    onOpenChange(false);
   }
 
   return (
@@ -156,8 +137,8 @@ function NewBookingDialog({
                     </FormControl>
                     <SelectContent>
                       {quadras.map((quadra) => (
-                        <SelectItem key={quadra.id} value={quadra.nome}>
-                          {quadra.nome}
+                        <SelectItem key={quadra.id} value={quadra.id}>
+                          {quadra.nomeQuadra}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -175,7 +156,7 @@ function NewBookingDialog({
                   <FormControl>
                     <RadioGroup
                       onValueChange={field.onChange}
-                      defaultValue={field.value}
+                      defaultValue={field.value as string}
                       className="flex items-center space-x-4"
                     >
                       <FormItem className="flex items-center space-x-2 space-y-0">
@@ -197,8 +178,11 @@ function NewBookingDialog({
               )}
             />
             <DialogFooter>
-              <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>Cancelar</Button>
-              <Button type="submit">Agendar</Button>
+              <Button type="button" variant="ghost" onClick={() => onOpenChange(false)} disabled={isSubmitting}>Cancelar</Button>
+              <Button type="submit" disabled={isSubmitting}>
+                {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Agendar
+              </Button>
             </DialogFooter>
           </form>
         </Form>
@@ -209,12 +193,22 @@ function NewBookingDialog({
 
 
 export default function AgendaPage() {
+  const { user } = useUser();
+  const firestore = useFirestore();
+  const { toast } = useToast();
+
   const [currentDate, setCurrentDate] = useState(new Date());
   const [isDatePickerOpen, setDatePickerOpen] = useState(false);
-  const [bookings, setBookings] = useState(initialBookings);
   const [isNewBookingDialogOpen, setNewBookingDialogOpen] = useState(false);
   const [selectedSlot, setSelectedSlot] = useState<{date: Date, time: string} | null>(null);
-  const { toast } = useToast();
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const quadrasRef = useMemoFirebase(() => (user ? collection(firestore, 'proprietarios', user.uid, 'quadras') : null), [firestore, user]);
+  const reservationsQuery = useMemoFirebase(() => user ? query(collectionGroup(firestore, 'reservas'), where('proprietarioId', '==', user.uid)) : null, [firestore, user]);
+
+  const { data: quadras, isLoading: quadrasLoading } = useCollection<Quadra>(quadrasRef);
+  const { data: reservations, isLoading: reservationsLoading } = useCollection<Reserva>(reservationsQuery);
+
 
   const week = useMemo(() => {
     const start = startOfWeek(currentDate, { locale: ptBR });
@@ -237,16 +231,19 @@ export default function AgendaPage() {
   const statusStyles = {
     pago: 'bg-emerald-500/15 text-emerald-600 border-emerald-500/30',
     pendente: 'bg-amber-400/15 text-amber-600 border-amber-400/30',
+    cancelado: 'bg-rose-500/15 text-rose-600 border-rose-500/30',
   };
 
-  const findBooking = (time: string, day: Date) => {
-    return bookings.find((booking) => {
-        return isSameDay(booking.date, day) && booking.time === time;
+  const findBookingsForSlot = (time: string, day: Date) => {
+    if (!reservations) return [];
+    return reservations.filter((booking) => {
+        const bookingDate = parseISO(booking.dataHora);
+        return isSameDay(bookingDate, day) && format(bookingDate, 'HH:mm') === time;
     });
   };
 
   const handleNewBookingClick = (day: Date, hour: string) => {
-    if (isBefore(day, startOfToday())) {
+    if (isBefore(day, startOfToday()) && !isSameDay(day, startOfToday())) {
         toast({
             variant: "destructive",
             title: "Data Inválida",
@@ -258,23 +255,58 @@ export default function AgendaPage() {
     setNewBookingDialogOpen(true);
   }
     
-  const handleSubmitBooking = (data: BookingFormValues) => {
-    if (!selectedSlot) return;
+  const handleSubmitBooking = async (data: BookingFormValues) => {
+    if (!selectedSlot || !user || !quadras) return;
 
-    const newBooking = {
-      date: selectedSlot.date,
-      time: selectedSlot.time,
-      client: data.client,
-      court: data.court,
+    setIsSubmitting(true);
+    const selectedQuadra = quadras.find(q => q.id === data.court);
+
+    if (!selectedQuadra) {
+        toast({ variant: 'destructive', title: 'Erro', description: 'Quadra selecionada inválida.' });
+        setIsSubmitting(false);
+        return;
+    }
+    
+    const reservationDate = new Date(selectedSlot.date);
+    const [hour, minute] = selectedSlot.time.split(':');
+    reservationDate.setHours(parseInt(hour), parseInt(minute));
+
+    const newBooking: Omit<Reserva, 'id'> = {
+      proprietarioId: user.uid,
+      quadraId: selectedQuadra.id,
+      quadraNome: selectedQuadra.nomeQuadra,
+      clienteNome: data.client,
+      dataHora: reservationDate.toISOString(),
       status: data.status,
-      tone: courtTones[data.court as keyof typeof courtTones] || 'sky',
+      tipoPagamento: 'nao-definido',
     };
 
-    setBookings(prev => [...prev, newBooking]);
-    toast({
-        title: "Agendamento Criado!",
-        description: `Reserva para ${data.client} no dia ${format(selectedSlot.date, 'dd/MM')} às ${selectedSlot.time}.`,
-    })
+    const reservationsRef = collection(firestore, 'proprietarios', user.uid, 'quadras', selectedQuadra.id, 'reservas');
+    
+    try {
+        await addDocumentNonBlocking(reservationsRef, newBooking);
+        toast({
+            title: "Agendamento Criado!",
+            description: `Reserva para ${data.client} no dia ${format(selectedSlot.date, 'dd/MM')} às ${selectedSlot.time}.`,
+        });
+        setNewBookingDialogOpen(false);
+    } catch (error) {
+        toast({
+            variant: "destructive",
+            title: "Erro ao Agendar",
+            description: "Ocorreu um erro ao salvar a reserva. Tente novamente.",
+        });
+    } finally {
+        setIsSubmitting(false);
+    }
+  }
+  
+  if (quadrasLoading || reservationsLoading) {
+    return (
+        <div className="flex h-[calc(100vh-120px)] w-full items-center justify-center">
+            <Loader2 className="h-12 w-12 animate-spin text-primary" />
+        </div>
+    );
   }
 
   return (
@@ -341,27 +373,42 @@ export default function AgendaPage() {
                   <div key={hour} className="grid grid-cols-[100px_repeat(7,minmax(150px,1fr))]">
                     <div className="flex items-center justify-center px-4 py-6 text-sm text-muted-foreground">{hour}</div>
                     {week.days.map((day) => {
-                      const booking = findBooking(hour, day);
-                      const isPast = isBefore(day, startOfToday());
+                      const bookingsInSlot = findBookingsForSlot(hour, day);
+                      const isPast = isBefore(day, startOfToday()) && !isSameDay(day, startOfToday());
+                      const availableCourts = (quadras?.length || 0) - bookingsInSlot.length;
                       return (
                         <div key={day.toISOString()} className="px-2 py-2 border-l border-border/60">
-                          {booking ? (
-                            <div
-                              className={cn(
-                                'h-full rounded-2xl border px-4 py-3 shadow-[0_18px_40px_-30px_rgba(15,23,42,0.5)]',
-                                toneStyles[booking.tone]
-                              )}
-                            >
-                              <p className="text-sm font-semibold">{booking.client}</p>
-                              <p className="text-xs font-semibold text-muted-foreground">
-                                {booking.court}
-                              </p>
-                              <Badge
-                                variant="outline"
-                                className={cn('mt-3 capitalize border bg-white/70', statusStyles[booking.status as keyof typeof statusStyles])}
-                              >
-                                {booking.status}
-                              </Badge>
+                          {bookingsInSlot.length > 0 ? (
+                            <div className="space-y-2">
+                            {bookingsInSlot.map(booking => (
+                                <div
+                                key={booking.id}
+                                className={cn(
+                                    'rounded-lg border px-3 py-2 shadow-sm',
+                                    toneStyles[(booking.quadraId || 'Q1').slice(-1)] // Temporary logic for color
+                                )}
+                                >
+                                <p className="text-xs font-semibold">{booking.clienteNome || 'Cliente'}</p>
+                                <p className="text-xs font-semibold text-muted-foreground">
+                                    {booking.quadraNome}
+                                </p>
+                                <Badge
+                                    variant="outline"
+                                    className={cn('mt-2 capitalize border text-xs bg-white/70', statusStyles[booking.status as keyof typeof statusStyles])}
+                                >
+                                    {booking.status}
+                                </Badge>
+                                </div>
+                            ))}
+                            {availableCourts > 0 && (
+                                 <button
+                                    onClick={() => handleNewBookingClick(day, hour)}
+                                    disabled={isPast}
+                                    className="h-full w-full rounded-lg border border-dashed border-primary/40 bg-primary/5 px-4 py-2 text-xs text-primary/80 flex items-center justify-center transition-colors hover:bg-primary/10"
+                                >
+                                    + Agendar
+                                </button>
+                            )}
                             </div>
                           ) : (
                             <button
@@ -392,6 +439,8 @@ export default function AgendaPage() {
             onOpenChange={setNewBookingDialogOpen}
             selectedSlot={selectedSlot}
             onSubmitBooking={handleSubmitBooking}
+            quadras={quadras || []}
+            isSubmitting={isSubmitting}
         />
     </div>
   );

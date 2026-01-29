@@ -1,12 +1,15 @@
 'use client'
 
+import React, { useEffect, useState, useMemo } from "react"
 import {
   File,
   PlusCircle,
   Search,
   MoreHorizontal,
-  Users
+  Users,
+  Loader2
 } from "lucide-react"
+import { collection, collectionGroup, getDocs, query, where, doc, documentId } from "firebase/firestore"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -34,53 +37,93 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
+import { useUser, useFirestore, useCollection, useMemoFirebase } from "@/firebase"
+import { Cliente, Reserva } from "@/lib/types"
 
-const clientsData = [
-  {
-    id: "CLI001",
-    name: "Grupo do Fute",
-    contact: "joao@email.com",
-    reservations: 12,
-    lastVisit: "2024-07-15",
-  },
-  {
-    id: "CLI002",
-    name: "Ana e Amigos",
-    contact: "(11) 98765-4321",
-    reservations: 8,
-    lastVisit: "2024-07-12",
-  },
-  {
-    id: "CLI003",
-    name: "Carlos",
-    contact: "carlos.tenis@email.com",
-    reservations: 5,
-    lastVisit: "2024-07-10",
-  },
-  {
-    id: "CLI004",
-    name: "Equipe Rocket",
-    contact: "jessie@email.com",
-    reservations: 3,
-    lastVisit: "2024-06-25",
-  },
-  {
-    id: "CLI005",
-    name: "Fute de Terça",
-    contact: "pedro.fute@email.com",
-    reservations: 25,
-    lastVisit: "2024-07-16",
-  },
-  {
-    id: "CLI006",
-    name: "Vôlei de Sábado",
-    contact: "sabado.volei@email.com",
-    reservations: 15,
-    lastVisit: "2024-07-13",
-  },
-]
 
 export default function ClientesPage() {
+    const { user } = useUser();
+    const firestore = useFirestore();
+    const [clients, setClients] = useState<Cliente[]>([]);
+    const [loadingClients, setLoadingClients] = useState(true);
+
+    const reservationsQuery = useMemoFirebase(
+      () => user ? query(collectionGroup(firestore, 'reservas'), where('proprietarioId', '==', user.uid)) : null,
+      [firestore, user]
+    );
+
+    const { data: reservations, isLoading: loadingReservations } = useCollection<Reserva>(reservationsQuery);
+
+    useEffect(() => {
+        if (loadingReservations || !reservations) {
+            if(!loadingReservations){
+                setLoadingClients(false);
+            }
+            return;
+        };
+
+        const clientIds = [...new Set(reservations.map(r => r.clienteId).filter(Boolean))] as string[];
+
+        if (clientIds.length === 0) {
+            setClients([]);
+            setLoadingClients(false);
+            return;
+        }
+
+        const fetchClients = async () => {
+            setLoadingClients(true);
+            try {
+                const clientsRef = collection(firestore, 'clientes');
+                // Firestore 'in' query is limited to 30 elements. For more, chunk the array.
+                const q = query(clientsRef, where(documentId(), 'in', clientIds.slice(0, 30)));
+                const clientSnap = await getDocs(q);
+                const fetchedClients = clientSnap.docs.map(d => ({ id: d.id, ...d.data() })) as Cliente[];
+                setClients(fetchedClients);
+            } catch (e) {
+                console.error("Error fetching clients:", e);
+                setClients([]);
+            } finally {
+                setLoadingClients(false);
+            }
+        };
+
+        fetchClients();
+
+    }, [reservations, loadingReservations, firestore]);
+    
+    const clientStats = useMemo(() => {
+        const activeClients = new Set<string>();
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+        reservations?.forEach(r => {
+            if (r.clienteId && new Date(r.dataHora) > thirtyDaysAgo) {
+                activeClients.add(r.clienteId);
+            }
+        });
+
+        return {
+            totalClients: clients.length,
+            activeClientsCount: activeClients.size,
+            totalReservations: reservations?.length || 0,
+        };
+    }, [clients, reservations]);
+
+    const findClientInfo = (clientId: string) => {
+        const clientReservations = reservations?.filter(r => r.clienteId === clientId);
+        const lastVisit = clientReservations?.reduce((latest, r) => {
+            const rDate = new Date(r.dataHora);
+            return rDate > latest ? rDate : latest;
+        }, new Date(0));
+
+        return {
+            reservations: clientReservations?.length || 0,
+            lastVisit: lastVisit && lastVisit.getTime() > 0 ? lastVisit.toLocaleDateString('pt-BR') : 'N/A'
+        }
+    }
+    
+  const isLoading = loadingReservations || loadingClients;
+
   return (
     <div className="space-y-6">
        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
@@ -97,9 +140,10 @@ export default function ClientesPage() {
                       type="search"
                       placeholder="Buscar cliente..."
                       className="w-full rounded-lg bg-background pl-8"
+                      disabled
                   />
               </div>
-              <Button>
+              <Button disabled>
                   <PlusCircle className="mr-2 h-4 w-4" /> Novo Cliente
               </Button>
           </div>
@@ -111,8 +155,8 @@ export default function ClientesPage() {
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">8</div>
-            <p className="text-xs text-muted-foreground">Clientes cadastrados</p>
+            {isLoading ? <Loader2 className="h-6 w-6 animate-spin"/> : <div className="text-2xl font-bold">{clientStats.totalClients}</div>}
+            <p className="text-xs text-muted-foreground">Clientes que já reservaram.</p>
           </CardContent>
         </Card>
         <Card>
@@ -121,8 +165,8 @@ export default function ClientesPage() {
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">6</div>
-            <p className="text-xs text-muted-foreground">+15% em relação ao mês passado</p>
+            {isLoading ? <Loader2 className="h-6 w-6 animate-spin"/> : <div className="text-2xl font-bold">{clientStats.activeClientsCount}</div>}
+            <p className="text-xs text-muted-foreground">Clientes com reservas recentes</p>
           </CardContent>
         </Card>
         <Card>
@@ -131,7 +175,7 @@ export default function ClientesPage() {
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">80</div>
+            {isLoading ? <Loader2 className="h-6 w-6 animate-spin"/> : <div className="text-2xl font-bold">{clientStats.totalReservations}</div>}
             <p className="text-xs text-muted-foreground">Reservas realizadas por clientes</p>
           </CardContent>
         </Card>
@@ -158,40 +202,53 @@ export default function ClientesPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {clientsData.map((client) => (
-                <TableRow key={client.id}>
-                  <TableCell className="font-medium">{client.name}</TableCell>
-                  <TableCell className="hidden md:table-cell text-muted-foreground">{client.contact}</TableCell>
-                   <TableCell className="hidden md:table-cell text-center text-muted-foreground">{client.reservations}</TableCell>
-                  <TableCell className="hidden sm:table-cell text-muted-foreground">
-                    {new Date(client.lastVisit).toLocaleDateString('pt-BR')}
-                  </TableCell>
-                  <TableCell>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button aria-haspopup="true" size="icon" variant="ghost">
-                          <MoreHorizontal className="h-4 w-4" />
-                          <span className="sr-only">Toggle menu</span>
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuLabel>Ações</DropdownMenuLabel>
-                        <DropdownMenuItem>Ver Detalhes</DropdownMenuItem>
-                        <DropdownMenuItem>Editar</DropdownMenuItem>
-                        <DropdownMenuItem className="text-destructive">
-                          Excluir
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
+              {isLoading && (
+                <TableRow>
+                  <TableCell colSpan={5} className="text-center"><Loader2 className="h-6 w-6 animate-spin mx-auto my-4"/></TableCell>
                 </TableRow>
-              ))}
+              )}
+              {!isLoading && clients.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={5} className="text-center">Nenhum cliente encontrado.</TableCell>
+                </TableRow>
+              )}
+              {!isLoading && clients.map((client) => {
+                const info = findClientInfo(client.id);
+                return (
+                    <TableRow key={client.id}>
+                    <TableCell className="font-medium">{client.primeiroNome} {client.sobrenome}</TableCell>
+                    <TableCell className="hidden md:table-cell text-muted-foreground">{client.email}</TableCell>
+                    <TableCell className="hidden md:table-cell text-center text-muted-foreground">{info.reservations}</TableCell>
+                    <TableCell className="hidden sm:table-cell text-muted-foreground">
+                        {info.lastVisit}
+                    </TableCell>
+                    <TableCell>
+                        <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button aria-haspopup="true" size="icon" variant="ghost">
+                            <MoreHorizontal className="h-4 w-4" />
+                            <span className="sr-only">Toggle menu</span>
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                            <DropdownMenuLabel>Ações</DropdownMenuLabel>
+                            <DropdownMenuItem disabled>Ver Detalhes</DropdownMenuItem>
+                            <DropdownMenuItem disabled>Editar</DropdownMenuItem>
+                            <DropdownMenuItem className="text-destructive" disabled>
+                            Excluir
+                            </DropdownMenuItem>
+                        </DropdownMenuContent>
+                        </DropdownMenu>
+                    </TableCell>
+                    </TableRow>
+                )
+              })}
             </TableBody>
           </Table>
         </CardContent>
         <CardFooter>
           <div className="text-xs text-muted-foreground">
-            Mostrando <strong>1-6</strong> de <strong>8</strong> clientes
+            Mostrando <strong>{clients.length}</strong> de <strong>{clientStats.totalClients}</strong> clientes
           </div>
         </CardFooter>
       </Card>

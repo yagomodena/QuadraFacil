@@ -28,9 +28,12 @@ export interface Cliente {
 
 export interface Reserva {
     id: string;
+    proprietarioId: string;
     quadraId: string;
-    clienteId: string;
-    dataHora: string;
+    quadraNome?: string; 
+    clienteId?: string; 
+    clienteNome?: string;
+    dataHora: string; 
     status: 'pago' | 'pendente' | 'cancelado';
     tipoPagamento: string;
 }

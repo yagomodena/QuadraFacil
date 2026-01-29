@@ -1,6 +1,6 @@
 'use client'
 
-import { PlusCircle, MoreHorizontal } from "lucide-react"
+import { PlusCircle, MoreHorizontal, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import {
@@ -19,20 +19,27 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Badge } from "@/components/ui/badge"
-
-const quadras = [
-    { id: 'Q1', nome: 'Quadra 1 (Futebol)', tipo: 'Futebol', preco: 'R$ 80,00/h' },
-    { id: 'Q2', nome: 'Quadra 2 (Futebol)', tipo: 'Futebol', preco: 'R$ 80,00/h' },
-    { id: 'Q3', nome: 'Quadra de Vôlei', tipo: 'Vôlei de Praia', preco: 'R$ 60,00/h' },
-    { id: 'Q4', nome: 'Quadra de Tênis', tipo: 'Tênis', preco: 'R$ 90,00/h' },
-]
+import { useUser, useFirestore, useCollection, useMemoFirebase } from "@/firebase"
+import { collection } from "firebase/firestore"
+import { Quadra } from "@/lib/types"
 
 export default function QuadrasPage() {
+    const { user, isUserLoading } = useUser();
+    const firestore = useFirestore();
+
+    const quadrasRef = useMemoFirebase(
+      () => (user ? collection(firestore, 'proprietarios', user.uid, 'quadras') : null),
+      [firestore, user]
+    );
+    const { data: quadras, isLoading: isQuadrasLoading } = useCollection<Quadra>(quadrasRef);
+
+    const isLoading = isUserLoading || isQuadrasLoading;
+
     return (
         <>
             <div className="flex items-center justify-between">
                 <h1 className="text-2xl font-semibold font-headline">Minhas Quadras</h1>
-                <Button>
+                <Button disabled>
                     <PlusCircle className="mr-2 h-4 w-4" /> Adicionar Quadra
                 </Button>
             </div>
@@ -55,13 +62,25 @@ export default function QuadrasPage() {
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {quadras.map((quadra) => (
-                                <TableRow key={quadra.id}>
-                                    <TableCell className="font-medium">{quadra.nome}</TableCell>
-                                    <TableCell className="hidden md:table-cell">
-                                        <Badge variant="outline">{quadra.tipo}</Badge>
+                            {isLoading && (
+                                <TableRow>
+                                    <TableCell colSpan={4} className="text-center">
+                                        <Loader2 className="h-6 w-6 animate-spin mx-auto my-4" />
                                     </TableCell>
-                                    <TableCell className="hidden md:table-cell">{quadra.preco}</TableCell>
+                                </TableRow>
+                            )}
+                            {!isLoading && quadras?.length === 0 && (
+                                <TableRow>
+                                    <TableCell colSpan={4} className="text-center">Nenhuma quadra cadastrada.</TableCell>
+                                </TableRow>
+                            )}
+                            {!isLoading && quadras?.map((quadra) => (
+                                <TableRow key={quadra.id}>
+                                    <TableCell className="font-medium">{quadra.nomeQuadra}</TableCell>
+                                    <TableCell className="hidden md:table-cell">
+                                        <Badge variant="outline">{quadra.tipoEsporte}</Badge>
+                                    </TableCell>
+                                    <TableCell className="hidden md:table-cell">{`R$ ${quadra.precoHora.toFixed(2)}/h`}</TableCell>
                                     <TableCell>
                                         <DropdownMenu>
                                             <DropdownMenuTrigger asChild>
@@ -72,9 +91,9 @@ export default function QuadrasPage() {
                                             </DropdownMenuTrigger>
                                             <DropdownMenuContent align="end">
                                                 <DropdownMenuLabel>Ações</DropdownMenuLabel>
-                                                <DropdownMenuItem>Editar</DropdownMenuItem>
-                                                <DropdownMenuItem>Desativar</DropdownMenuItem>
-                                                <DropdownMenuItem className="text-destructive">Excluir</DropdownMenuItem>
+                                                <DropdownMenuItem disabled>Editar</DropdownMenuItem>
+                                                <DropdownMenuItem disabled>Desativar</DropdownMenuItem>
+                                                <DropdownMenuItem disabled className="text-destructive">Excluir</DropdownMenuItem>
                                             </DropdownMenuContent>
                                         </DropdownMenu>
                                     </TableCell>

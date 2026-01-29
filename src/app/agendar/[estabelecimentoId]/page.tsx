@@ -2,12 +2,13 @@
 
 import { useMemo, useState, useEffect } from 'react';
 import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
-import { format, startOfWeek, endOfWeek, eachDayOfInterval, addDays, subDays, isSameDay, isBefore, startOfToday } from 'date-fns';
+import { format, startOfWeek, endOfWeek, eachDayOfInterval, addDays, subDays, isSameDay, isBefore, startOfToday, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useParams, usePathname, useRouter } from 'next/navigation';
+import { collection, collectionGroup, doc, query, where } from 'firebase/firestore';
 
 import { Calendar } from '@/components/ui/calendar';
 import { Card, CardContent } from '@/components/ui/card';
@@ -40,35 +41,8 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { Header } from '@/components/layout/header';
 import { Footer } from '@/components/layout/footer';
-import { useUser } from '@/firebase';
-import { addDocumentNonBlocking } from '@/firebase/non-blocking-updates';
-import { collection } from 'firebase/firestore';
-import { useFirestore } from '@/firebase/provider';
-
-// Mock data for now
-const establishmentData = {
-    id: 'estabelecimentoX',
-    name: 'Arena Esportiva',
-    quadras: [
-        { id: 'Q1', nome: 'Quadra 1 (Futebol)' },
-        { id: 'Q2', nome: 'Quadra 2 (Futebol)' },
-        { id: 'Q3', nome: 'Quadra de Vôlei' },
-        { id: 'Q4', nome: 'Quadra de Tênis' },
-    ]
-};
-
-const today = new Date();
-const startOfThisWeek = startOfWeek(today, { locale: ptBR });
-
-const initialBookings = [
-    { date: startOfThisWeek, time: '08:00', court: 'Quadra 1 (Futebol)' },
-    { date: addDays(startOfThisWeek, 1), time: '09:00', court: 'Quadra 2 (Futebol)' },
-    { date: addDays(startOfThisWeek, 2), time: '11:00', court: 'Quadra de Vôlei' },
-    { date: addDays(startOfThisWeek, 2), time: '14:00', court: 'Quadra 1 (Futebol)' },
-    { date: addDays(startOfThisWeek, 3), time: '16:00', court: 'Quadra de Tênis' },
-    { date: addDays(startOfThisWeek, 4), time: '19:00', court: 'Quadra 2 (Futebol)' },
-    { date: addDays(startOfThisWeek, 5), time: '10:00', court: 'Quadra 1 (Futebol)' },
-];
+import { useUser, useFirestore, useDoc, useCollection, useMemoFirebase, addDocumentNonBlocking } from '@/firebase';
+import { Proprietario, Quadra, Reserva } from '@/lib/types';
 
 const bookingFormSchema = z.object({
   court: z.string().min(1, "A quadra é obrigatória."),
@@ -89,7 +63,7 @@ function NewBookingDialog({
   onOpenChange: (isOpen: boolean) => void,
   selectedSlot: { date: Date, time: string } | null,
   onSubmitBooking: (data: BookingFormValues) => void,
-  quadras: {id: string, nome: string}[],
+  quadras: Quadra[],
   isSubmitting: boolean,
 }) {
   const form = useForm<BookingFormValues>({
@@ -136,8 +110,8 @@ function NewBookingDialog({
                     </FormControl>
                     <SelectContent>
                       {quadras.map((quadra) => (
-                        <SelectItem key={quadra.id} value={quadra.nome}>
-                          {quadra.nome}
+                        <SelectItem key={quadra.id} value={quadra.id}>
+                          {quadra.nomeQuadra}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -169,14 +143,22 @@ export default function PublicBookingPage() {
   const firestore = useFirestore();
 
   const { user, isUserLoading } = useUser();
+  const { toast } = useToast();
 
   const [currentDate, setCurrentDate] = useState(new Date());
   const [isDatePickerOpen, setDatePickerOpen] = useState(false);
-  const [bookings, setBookings] = useState(initialBookings);
   const [isNewBookingDialogOpen, setNewBookingDialogOpen] = useState(false);
   const [selectedSlot, setSelectedSlot] = useState<{date: Date, time: string} | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const { toast } = useToast();
+
+  const proprietarioRef = useMemoFirebase(() => establishmentId ? doc(firestore, 'proprietarios', establishmentId) : null, [firestore, establishmentId]);
+  const quadrasRef = useMemoFirebase(() => establishmentId ? collection(firestore, 'proprietarios', establishmentId, 'quadras') : null, [firestore, establishmentId]);
+  const reservationsQuery = useMemoFirebase(() => establishmentId ? query(collectionGroup(firestore, 'reservas'), where('proprietarioId', '==', establishmentId)) : null, [firestore, establishmentId]);
+
+  const { data: proprietario, isLoading: proprietarioLoading } = useDoc<Proprietario>(proprietarioRef);
+  const { data: quadras, isLoading: quadrasLoading } = useCollection<Quadra>(quadrasRef);
+  const { data: reservations, isLoading: reservationsLoading } = useCollection<Reserva>(reservationsQuery);
+
 
   const week = useMemo(() => {
     const start = startOfWeek(currentDate, { locale: ptBR });
@@ -219,11 +201,11 @@ export default function PublicBookingPage() {
   }
     
   const handleSubmitBooking = async (data: BookingFormValues) => {
-    if (!selectedSlot || !user) return;
+    if (!selectedSlot || !user || !quadras) return;
 
     setIsSubmitting(true);
 
-    const selectedQuadra = establishmentData.quadras.find(q => q.nome === data.court);
+    const selectedQuadra = quadras.find(q => q.id === data.court);
     if (!selectedQuadra) {
         toast({ variant: 'destructive', title: 'Erro', description: 'Quadra selecionada inválida.' });
         setIsSubmitting(false);
@@ -234,9 +216,12 @@ export default function PublicBookingPage() {
     const [hour, minute] = selectedSlot.time.split(':');
     reservationDate.setHours(parseInt(hour), parseInt(minute));
 
-    const newBooking = {
+    const newBooking: Omit<Reserva, 'id'> = {
+      proprietarioId: establishmentId,
       clienteId: user.uid,
+      clienteNome: user.displayName || `${user.email}`,
       quadraId: selectedQuadra.id,
+      quadraNome: selectedQuadra.nomeQuadra,
       dataHora: reservationDate.toISOString(),
       status: 'pendente',
       tipoPagamento: 'nao-definido',
@@ -246,26 +231,12 @@ export default function PublicBookingPage() {
     
     try {
         await addDocumentNonBlocking(bookingsRef, newBooking);
-        
-        // Add to local state for immediate UI update until Firestore is fully integrated
-        setBookings(prev => [
-            ...prev, 
-            { 
-                date: selectedSlot.date, 
-                time: selectedSlot.time, 
-                court: data.court, 
-                client: user.displayName || 'Cliente', 
-                status: 'pendente' 
-            }
-        ]);
-
         toast({
             title: "Solicitação de Reserva Enviada!",
             description: `Sua reserva para ${format(selectedSlot.date, 'dd/MM')} às ${selectedSlot.time} aguarda confirmação.`,
         });
         setNewBookingDialogOpen(false);
     } catch (error) {
-        // Error is handled globally by the error emitter in non-blocking-updates
         toast({
             variant: "destructive",
             title: "Erro ao Agendar",
@@ -277,15 +248,29 @@ export default function PublicBookingPage() {
   }
   
   const getBookedCountForSlot = (hour: string, day: Date) => {
-    return bookings.filter(b => isSameDay(b.date, day) && b.time === hour).length;
+    if (!reservations) return 0;
+    return reservations.filter(b => {
+        const bookingDate = parseISO(b.dataHora);
+        return isSameDay(bookingDate, day) && format(bookingDate, 'HH:mm') === hour
+    }).length;
   }
 
-  const allCourtsCount = establishmentData.quadras.length;
+  const allCourtsCount = quadras?.length || 0;
+  const isLoading = isUserLoading || proprietarioLoading || quadrasLoading || reservationsLoading;
 
-  if (isUserLoading) {
+  if (isLoading) {
     return (
         <div className="flex min-h-screen flex-col items-center justify-center bg-muted/40">
             <Loader2 className="h-12 w-12 animate-spin text-primary" />
+            <p className="mt-4 text-muted-foreground">Carregando agenda...</p>
+        </div>
+    )
+  }
+
+  if (!proprietario) {
+    return (
+        <div className="flex min-h-screen flex-col items-center justify-center bg-muted/40">
+            <p className="mt-4 text-destructive">Estabelecimento não encontrado.</p>
         </div>
     )
   }
@@ -299,7 +284,7 @@ export default function PublicBookingPage() {
                     <div className="space-y-1">
                         <h1 className="text-2xl font-semibold font-headline">Reservar Horário</h1>
                         <p className="text-muted-foreground">
-                            Agenda de horários para <span className="font-bold text-primary">{establishmentData.name}</span>.
+                            Agenda de horários para <span className="font-bold text-primary">{proprietario.nomeEstabelecimento}</span>.
                         </p>
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
@@ -359,7 +344,7 @@ export default function PublicBookingPage() {
                                 <div className="flex items-center justify-center px-4 py-6 text-sm text-muted-foreground">{hour}</div>
                                 {week.days.map((day) => {
                                   const bookedCount = getBookedCountForSlot(hour, day);
-                                  const isFullyBooked = bookedCount >= allCourtsCount;
+                                  const isFullyBooked = allCourtsCount > 0 && bookedCount >= allCourtsCount;
                                   const isPast = isBefore(day, startOfToday()) && !isSameDay(day, startOfToday());
                                 return (
                                     <div key={day.toISOString()} className="px-2 py-2 border-l border-border/60">
@@ -390,7 +375,7 @@ export default function PublicBookingPage() {
                     onOpenChange={setNewBookingDialogOpen}
                     selectedSlot={selectedSlot}
                     onSubmitBooking={handleSubmitBooking}
-                    quadras={establishmentData.quadras}
+                    quadras={quadras || []}
                     isSubmitting={isSubmitting}
                 />
             </div>

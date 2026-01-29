@@ -136,13 +136,25 @@
           "type": "string",
           "description": "Unique identifier for the Reserva entity."
         },
+        "proprietarioId": {
+          "type": "string",
+          "description": "Reference to the Proprietario who owns the court."
+        },
         "quadraId": {
           "type": "string",
-          "description": "Reference to Quadra. (Relationship: Quadra 1:N Reserva)"
+          "description": "Reference to Quadra."
+        },
+        "quadraNome": {
+          "type": "string",
+          "description": "Name of the court, for display purposes."
         },
         "clienteId": {
           "type": "string",
-          "description": "Reference to Cliente. (Relationship: Cliente 1:N Reserva)"
+          "description": "Reference to Cliente, if the reservation is made by a registered user."
+        },
+        "clienteNome": {
+          "type": "string",
+          "description": "Name of the client, if not a registered user or for display purposes."
         },
         "dataHora": {
           "type": "string",
@@ -160,11 +172,10 @@
       },
       "required": [
         "id",
+        "proprietarioId",
         "quadraId",
-        "clienteId",
         "dataHora",
-        "status",
-        "tipoPagamento"
+        "status"
       ]
     },
     "PagamentoDividido": {

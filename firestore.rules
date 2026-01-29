@@ -23,7 +23,7 @@
  *   user privacy and prevent data scraping.
  * - Owner-Only Writes: All write operations (create, update, delete) on any document are
  *   restricted to the document's owner, as determined by the path. For example, only the
- *   proprietor with the matching UID can create or modify a `quadra` document under their path.
+ *   proprietor with the matching UID can create or modify a `quadra` document under their own path.
  * - Relational Integrity: On document creation, rules enforce that internal ID fields (like `id`
  *   on a `Proprietario` document or `proprietarioId` on a `Quadra` document) match the corresponding
  *   ID from the document path. This prevents data inconsistency. These fields are immutable on update.
@@ -71,7 +71,7 @@ service cloud.firestore {
      * @principle Restricts access to a user's own data tree and enforces self-creation.
      */
     match /proprietarios/{proprietarioId} {
-      allow get: if isOwner(proprietarioId);
+      allow get: if true; // Publicly readable for public booking pages
       allow list: if false;
       allow create: if isOwner(proprietarioId) && request.resource.data.id == proprietarioId;
       allow update: if isExistingOwner(proprietarioId) && request.resource.data.id == resource.data.id;
@@ -86,11 +86,22 @@ service cloud.firestore {
      * @principle Enforces hierarchical ownership; only the parent document owner can manage children.
      */
     match /proprietarios/{proprietarioId}/quadras/{quadraId} {
-      allow get: if isOwner(proprietarioId);
-      allow list: if isOwner(proprietarioId);
+      allow get: if true; // Publicly readable for public booking pages
+      allow list: if true; // Publicly readable for public booking pages
       allow create: if isOwner(proprietarioId) && request.resource.data.proprietarioId == proprietarioId;
       allow update: if isExistingOwner(proprietarioId) && request.resource.data.proprietarioId == resource.data.proprietarioId;
       allow delete: if isExistingOwner(proprietarioId);
+    }
+    
+    // --- Collection Group Rules ---
+    // Rule for reservations collection group
+    match /{path=**}/reservas/{reservaId} {
+      // Allow proprietor to read all their reservations.
+      // Allow client to read their own reservations.
+      allow get: if isOwner(resource.data.proprietarioId) || isOwner(resource.data.clienteId);
+      // Allow proprietors to list all reservations within their domain.
+      // A collection group query by a client is not secure here without further checks.
+      allow list: if isOwner(request.query.get("where")[0][2]);
     }
 
     /**
@@ -102,10 +113,12 @@ service cloud.firestore {
      *            managed through a trusted backend (e.g., Cloud Functions).
      */
     match /proprietarios/{proprietarioId}/quadras/{quadraId}/reservas/{reservaId} {
-      allow get: if isOwner(proprietarioId);
+      allow get: if isOwner(proprietarioId) || isOwner(request.resource.data.clienteId);
       allow list: if isOwner(proprietarioId);
-      allow create: if (isSignedIn() && request.resource.data.clienteId == request.auth.uid) || isOwner(proprietarioId);
-      allow update: if isExistingOwner(proprietarioId);
+      // Allow owner to create, or a logged-in client to create if the IDs match
+      allow create: if (isOwner(proprietarioId) && request.resource.data.proprietarioId == proprietarioId) || 
+                      (request.resource.data.clienteId != null && request.resource.data.clienteId == request.auth.uid && request.resource.data.proprietarioId == proprietarioId);
+      allow update: if isExistingOwner(proprietarioId) && request.resource.data.proprietarioId == resource.data.proprietarioId;
       allow delete: if isExistingOwner(proprietarioId);
     }
 
@@ -136,8 +149,8 @@ service cloud.firestore {
      * @principle Restricts access to a user's own data tree and enforces self-creation.
      */
     match /clientes/{clienteId} {
-      allow get: if isOwner(clienteId);
-      allow list: if false;
+      allow get: if isSignedIn(); // Allow any signed-in user to read client profiles (for names etc)
+      allow list: if false; // Disallow listing all clients for privacy
       allow create: if isOwner(clienteId) && request.resource.data.id == clienteId;
       allow update: if isExistingOwner(clienteId) && request.resource.data.id == resource.data.id;
       allow delete: if isExistingOwner(clienteId);
