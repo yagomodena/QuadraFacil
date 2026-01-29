@@ -20,9 +20,10 @@ export interface Quadra {
 
 export interface Cliente {
     id: string;
-    nome: string;
+    primeiroNome: string;
+    sobrenome: string;
     email: string;
-    telefone: string;
+    telefone?: string;
 }
 
 export interface Reserva {

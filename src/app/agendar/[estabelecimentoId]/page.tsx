@@ -1,13 +1,13 @@
 'use client';
 
 import { useMemo, useState, useEffect } from 'react';
-import { Calendar as CalendarIcon, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
 import { format, startOfWeek, endOfWeek, eachDayOfInterval, addDays, subDays, isSameDay, isBefore, startOfToday } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { useParams } from 'next/navigation';
+import { useParams, usePathname, useRouter } from 'next/navigation';
 
 import { Calendar } from '@/components/ui/calendar';
 import { Card, CardContent } from '@/components/ui/card';
@@ -30,7 +30,6 @@ import {
     FormLabel,
     FormMessage,
 } from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
 import {
     Select,
     SelectContent,
@@ -41,6 +40,10 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { Header } from '@/components/layout/header';
 import { Footer } from '@/components/layout/footer';
+import { useUser } from '@/firebase';
+import { addDocumentNonBlocking } from '@/firebase/non-blocking-updates';
+import { collection } from 'firebase/firestore';
+import { useFirestore } from '@/firebase/provider';
 
 // Mock data for now
 const establishmentData = {
@@ -68,8 +71,6 @@ const initialBookings = [
 ];
 
 const bookingFormSchema = z.object({
-  clientName: z.string().min(1, "Seu nome é obrigatório."),
-  clientEmail: z.string().email("Seu e-mail é obrigatório."),
   court: z.string().min(1, "A quadra é obrigatória."),
 });
 
@@ -81,19 +82,19 @@ function NewBookingDialog({
   onOpenChange,
   selectedSlot,
   onSubmitBooking,
-  quadras
+  quadras,
+  isSubmitting,
 }: {
   isOpen: boolean,
   onOpenChange: (isOpen: boolean) => void,
   selectedSlot: { date: Date, time: string } | null,
   onSubmitBooking: (data: BookingFormValues) => void,
-  quadras: {id: string, nome: string}[]
+  quadras: {id: string, nome: string}[],
+  isSubmitting: boolean,
 }) {
   const form = useForm<BookingFormValues>({
     resolver: zodResolver(bookingFormSchema),
     defaultValues: {
-      clientName: "",
-      clientEmail: "",
       court: "",
     },
   });
@@ -108,7 +109,6 @@ function NewBookingDialog({
 
   const handleSubmit = (data: BookingFormValues) => {
     onSubmitBooking(data);
-    onOpenChange(false);
   }
 
   return (
@@ -122,32 +122,6 @@ function NewBookingDialog({
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4 py-4">
-            <FormField
-              control={form.control}
-              name="clientName"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Seu Nome</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Nome Completo" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-             <FormField
-              control={form.control}
-              name="clientEmail"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Seu E-mail</FormLabel>
-                  <FormControl>
-                    <Input type="email" placeholder="seu@email.com" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
             <FormField
               control={form.control}
               name="court"
@@ -174,7 +148,10 @@ function NewBookingDialog({
             />
             <DialogFooter>
               <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>Cancelar</Button>
-              <Button type="submit">Confirmar Agendamento</Button>
+              <Button type="submit" disabled={isSubmitting}>
+                {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Confirmar Agendamento
+              </Button>
             </DialogFooter>
           </form>
         </Form>
@@ -186,15 +163,19 @@ function NewBookingDialog({
 
 export default function PublicBookingPage() {
   const params = useParams();
-  const establishmentId = params.estabelecimentoId;
+  const establishmentId = params.estabelecimentoId as string;
+  const router = useRouter();
+  const pathname = usePathname();
+  const firestore = useFirestore();
 
-  // In the future, fetch real data based on establishmentId
-  // For now, we use mock data.
+  const { user, isUserLoading } = useUser();
+
   const [currentDate, setCurrentDate] = useState(new Date());
   const [isDatePickerOpen, setDatePickerOpen] = useState(false);
   const [bookings, setBookings] = useState(initialBookings);
   const [isNewBookingDialogOpen, setNewBookingDialogOpen] = useState(false);
   const [selectedSlot, setSelectedSlot] = useState<{date: Date, time: string} | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
 
   const week = useMemo(() => {
@@ -224,34 +205,90 @@ export default function PublicBookingPage() {
         });
         return;
     }
+    
+    if (isUserLoading) return;
+
+    if (!user) {
+        const redirectUrl = encodeURIComponent(pathname);
+        router.push(`/auth/cliente?redirectUrl=${redirectUrl}`);
+        return;
+    }
+
     setSelectedSlot({ date: day, time: hour });
     setNewBookingDialogOpen(true);
   }
     
-  const handleSubmitBooking = (data: BookingFormValues) => {
-    if (!selectedSlot) return;
+  const handleSubmitBooking = async (data: BookingFormValues) => {
+    if (!selectedSlot || !user) return;
+
+    setIsSubmitting(true);
+
+    const selectedQuadra = establishmentData.quadras.find(q => q.nome === data.court);
+    if (!selectedQuadra) {
+        toast({ variant: 'destructive', title: 'Erro', description: 'Quadra selecionada inválida.' });
+        setIsSubmitting(false);
+        return;
+    }
+
+    const reservationDate = new Date(selectedSlot.date);
+    const [hour, minute] = selectedSlot.time.split(':');
+    reservationDate.setHours(parseInt(hour), parseInt(minute));
 
     const newBooking = {
-      date: selectedSlot.date,
-      time: selectedSlot.time,
-      client: data.clientName, // In public page, this comes from form
-      court: data.court,
-      status: 'pendente', // Public bookings start as pending
+      clienteId: user.uid,
+      quadraId: selectedQuadra.id,
+      dataHora: reservationDate.toISOString(),
+      status: 'pendente',
+      tipoPagamento: 'nao-definido',
     };
 
-    setBookings(prev => [...prev, newBooking]);
-    toast({
-        title: "Solicitação de Reserva Enviada!",
-        description: `Sua reserva para ${format(selectedSlot.date, 'dd/MM')} às ${selectedSlot.time} aguarda confirmação.`,
-    })
+    const bookingsRef = collection(firestore, 'proprietarios', establishmentId, 'quadras', selectedQuadra.id, 'reservas');
+    
+    try {
+        await addDocumentNonBlocking(bookingsRef, newBooking);
+        
+        // Add to local state for immediate UI update until Firestore is fully integrated
+        setBookings(prev => [
+            ...prev, 
+            { 
+                date: selectedSlot.date, 
+                time: selectedSlot.time, 
+                court: data.court, 
+                client: user.displayName || 'Cliente', 
+                status: 'pendente' 
+            }
+        ]);
+
+        toast({
+            title: "Solicitação de Reserva Enviada!",
+            description: `Sua reserva para ${format(selectedSlot.date, 'dd/MM')} às ${selectedSlot.time} aguarda confirmação.`,
+        });
+        setNewBookingDialogOpen(false);
+    } catch (error) {
+        // Error is handled globally by the error emitter in non-blocking-updates
+        toast({
+            variant: "destructive",
+            title: "Erro ao Agendar",
+            description: "Não foi possível criar sua reserva. Tente novamente.",
+        });
+    } finally {
+        setIsSubmitting(false);
+    }
   }
   
-  // This calculates how many courts are booked at a given slot
   const getBookedCountForSlot = (hour: string, day: Date) => {
     return bookings.filter(b => isSameDay(b.date, day) && b.time === hour).length;
   }
 
   const allCourtsCount = establishmentData.quadras.length;
+
+  if (isUserLoading) {
+    return (
+        <div className="flex min-h-screen flex-col items-center justify-center bg-muted/40">
+            <Loader2 className="h-12 w-12 animate-spin text-primary" />
+        </div>
+    )
+  }
 
   return (
     <div className="flex min-h-screen flex-col bg-muted/40">
@@ -354,6 +391,7 @@ export default function PublicBookingPage() {
                     selectedSlot={selectedSlot}
                     onSubmitBooking={handleSubmitBooking}
                     quadras={establishmentData.quadras}
+                    isSubmitting={isSubmitting}
                 />
             </div>
         </main>

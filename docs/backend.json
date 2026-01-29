@@ -101,9 +101,13 @@
           "type": "string",
           "description": "Unique identifier for the Cliente entity."
         },
-        "nome": {
+        "primeiroNome": {
           "type": "string",
-          "description": "Name of the client."
+          "description": "First name of the client."
+        },
+        "sobrenome": {
+          "type": "string",
+          "description": "Last name of the client."
         },
         "email": {
           "type": "string",
@@ -117,9 +121,9 @@
       },
       "required": [
         "id",
-        "nome",
-        "email",
-        "telefone"
+        "primeiroNome",
+        "sobrenome",
+        "email"
       ]
     },
     "Reserva": {
@@ -202,7 +206,8 @@
   "auth": {
     "providers": [
       "password",
-      "anonymous"
+      "anonymous",
+      "google.com"
     ]
   },
   "firestore": {

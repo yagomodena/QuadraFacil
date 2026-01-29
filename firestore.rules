@@ -104,7 +104,7 @@ service cloud.firestore {
     match /proprietarios/{proprietarioId}/quadras/{quadraId}/reservas/{reservaId} {
       allow get: if isOwner(proprietarioId);
       allow list: if isOwner(proprietarioId);
-      allow create: if isOwner(proprietarioId);
+      allow create: if (isSignedIn() && request.resource.data.clienteId == request.auth.uid) || isOwner(proprietarioId);
       allow update: if isExistingOwner(proprietarioId);
       allow delete: if isExistingOwner(proprietarioId);
     }
