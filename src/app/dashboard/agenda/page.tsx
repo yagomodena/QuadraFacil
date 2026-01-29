@@ -1,14 +1,19 @@
-﻿'use client';
+'use client';
 
 import { useMemo, useState } from 'react';
+import { Calendar as CalendarIcon } from 'lucide-react';
+import { format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 import { Calendar } from '@/components/ui/calendar';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
-import { buttonVariants } from '@/components/ui/button';
+import { Button } from '@/components/ui/button';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 
 export default function AgendaPage() {
   const [date, setDate] = useState<Date | undefined>(new Date());
+  const [isDatePickerOpen, setDatePickerOpen] = useState(false);
 
   const courts = ['Quadra 1', 'Quadra 2', 'Quadra 3', 'Quadra 4'];
 
@@ -51,138 +56,100 @@ export default function AgendaPage() {
 
   return (
     <div className="min-h-[calc(100vh-120px)] space-y-6">
-      <div className="flex flex-col gap-4">
-        <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
-          <div className="space-y-1">
-            <h1 className="text-2xl font-semibold font-headline">Agenda</h1>
-            <p className="text-muted-foreground">
-              Visao diaria completa para {date ? date.toLocaleDateString('pt-BR') : 'Data selecionada'}.
-            </p>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="inline-flex rounded-full border border-border bg-background shadow-sm">
-              <button className="px-4 py-1.5 text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">Hoje</button>
-              <button className="px-4 py-1.5 text-xs font-semibold uppercase tracking-[0.2em] text-primary">Semana</button>
-            </div>
-            <div className="flex items-center gap-2 rounded-full border border-border bg-background px-3 py-1.5 text-xs font-semibold text-muted-foreground">
-              <button className="text-base leading-none">‹</button>
-              <span>02 - 06 Out</span>
-              <button className="text-base leading-none">›</button>
-            </div>
-            <div className="flex items-center gap-2">
-              <button className="rounded-full border border-border bg-background px-4 py-1.5 text-xs font-semibold uppercase tracking-[0.2em]">Buscar</button>
-              <button className="rounded-full bg-primary px-4 py-1.5 text-xs font-semibold uppercase tracking-[0.2em] text-primary-foreground shadow-lg">Novo agendamento</button>
-              <button className="rounded-full border border-border bg-background px-4 py-1.5 text-xs font-semibold uppercase tracking-[0.2em]">Configurar</button>
-            </div>
-          </div>
+      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <div className="space-y-1">
+          <h1 className="text-2xl font-semibold font-headline">Agenda</h1>
+          <p className="text-muted-foreground">
+            Visão diária para{' '}
+            {date ? format(date, "d 'de' MMMM 'de' yyyy", { locale: ptBR }) : 'data selecionada'}.
+          </p>
         </div>
-      </div>
-
-      <div className="grid gap-6 lg:grid-cols-[280px_1fr]">
-        <div className="space-y-6">
-          <Card className="border-border/60 bg-background/80">
-            <CardHeader className="border-b border-border/60">
-              <CardTitle className="text-sm uppercase tracking-[0.2em] text-muted-foreground">
-                Calendário
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-0">
+        <div className="flex flex-wrap items-center gap-2">
+          <Popover open={isDatePickerOpen} onOpenChange={setDatePickerOpen}>
+            <PopoverTrigger asChild>
+              <Button
+                variant={"outline"}
+                className={cn(
+                  "w-[280px] justify-start text-left font-normal",
+                  !date && "text-muted-foreground"
+                )}
+              >
+                <CalendarIcon className="mr-2 h-4 w-4" />
+                {date ? format(date, "PPP", { locale: ptBR }) : <span>Selecione uma data</span>}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0">
               <Calendar
                 mode="single"
                 selected={date}
-                onSelect={setDate}
-                className="rounded-md"
-                classNames={{
-                  day: cn(
-                    buttonVariants({ variant: "ghost" }),
-                    "h-9 w-9 p-0 font-normal aria-selected:opacity-100 rounded-full"
-                  ),
-                  day_selected:
-                    'bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground focus:bg-primary focus:text-primary-foreground',
-                  day_today: 'bg-muted text-foreground font-semibold',
+                onSelect={(day) => {
+                  setDate(day);
+                  setDatePickerOpen(false);
                 }}
+                initialFocus
               />
-            </CardContent>
-          </Card>
-
-          <Card className="border-border/60 bg-background/80">
-            <CardHeader className="border-b border-border/60">
-              <CardTitle className="text-sm uppercase tracking-[0.2em] text-muted-foreground">Resumo do dia</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4 p-4">
-              <div>
-                <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Ocupacao</p>
-                <p className="text-2xl font-semibold">72%</p>
-              </div>
-              <div>
-                <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Pagamentos</p>
-                <p className="text-2xl font-semibold">R$ 2.940</p>
-              </div>
-              <div>
-                <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Proximo horario</p>
-                <p className="text-2xl font-semibold">08:00</p>
-              </div>
-            </CardContent>
-          </Card>
+            </PopoverContent>
+          </Popover>
+          <Button>Novo agendamento</Button>
         </div>
+      </div>
 
-        <Card className="border-border/60 bg-background/95 shadow-[0_30px_80px_-60px_rgba(15,23,42,0.45)]">
-          <CardHeader className="border-b border-border/60 bg-muted/30">
-            <CardTitle className="text-base font-semibold">Agenda por hora</CardTitle>
-          </CardHeader>
-          <CardContent className="p-0">
-            <div className="relative h-[calc(100vh-220px)] min-h-[640px] overflow-auto">
-              <div className="min-w-[960px]">
-                <div className="sticky top-0 z-10 grid grid-cols-[120px_repeat(4,minmax(200px,1fr))] bg-background/95 backdrop-blur border-b border-border/60">
-                  <div className="px-4 py-3 text-xs uppercase tracking-[0.2em] text-muted-foreground">Horario</div>
-                  {courts.map((court) => (
-                    <div key={court} className="px-4 py-3 text-xs uppercase tracking-[0.2em] text-muted-foreground">
-                      {court}
-                    </div>
-                  ))}
-                </div>
-                <div className="divide-y divide-border/60">
-                  {hours.map((hour) => (
-                    <div key={hour} className="grid grid-cols-[120px_repeat(4,minmax(200px,1fr))]">
-                      <div className="px-4 py-6 text-sm text-muted-foreground">{hour}</div>
-                      {courts.map((court) => {
-                        const booking = findBooking(hour, court);
-                        return (
-                          <div key={`${hour}-${court}`} className="px-4 py-4">
-                            {booking ? (
-                              <div
-                                className={cn(
-                                  'h-full rounded-2xl border px-4 py-3 shadow-[0_18px_40px_-30px_rgba(15,23,42,0.5)]',
-                                  toneStyles[booking.tone]
-                                )}
+      <Card className="border-border/60 bg-background/95 shadow-[0_30px_80px_-60px_rgba(15,23,42,0.45)]">
+        <CardHeader className="border-b border-border/60 bg-muted/30">
+          <CardTitle className="text-base font-semibold">Agenda por hora</CardTitle>
+        </CardHeader>
+        <CardContent className="p-0">
+          <div className="relative h-[calc(100vh-220px)] min-h-[640px] overflow-auto">
+            <div className="min-w-[960px]">
+              <div className="sticky top-0 z-10 grid grid-cols-[120px_repeat(4,minmax(200px,1fr))] bg-background/95 backdrop-blur border-b border-border/60">
+                <div className="px-4 py-3 text-xs uppercase tracking-[0.2em] text-muted-foreground">Horario</div>
+                {courts.map((court) => (
+                  <div key={court} className="px-4 py-3 text-xs uppercase tracking-[0.2em] text-muted-foreground">
+                    {court}
+                  </div>
+                ))}
+              </div>
+              <div className="divide-y divide-border/60">
+                {hours.map((hour) => (
+                  <div key={hour} className="grid grid-cols-[120px_repeat(4,minmax(200px,1fr))]">
+                    <div className="px-4 py-6 text-sm text-muted-foreground">{hour}</div>
+                    {courts.map((court) => {
+                      const booking = findBooking(hour, court);
+                      return (
+                        <div key={`${hour}-${court}`} className="px-4 py-4">
+                          {booking ? (
+                            <div
+                              className={cn(
+                                'h-full rounded-2xl border px-4 py-3 shadow-[0_18px_40px_-30px_rgba(15,23,42,0.5)]',
+                                toneStyles[booking.tone]
+                              )}
+                            >
+                              <p className="text-sm font-semibold">{booking.client}</p>
+                              <p className="text-xs text-muted-foreground">
+                                {booking.time} - {booking.end} | {booking.court}
+                              </p>
+                              <Badge
+                                variant="outline"
+                                className={cn('mt-3 capitalize border bg-white/70', statusStyles[booking.status as keyof typeof statusStyles])}
                               >
-                                <p className="text-sm font-semibold">{booking.client}</p>
-                                <p className="text-xs text-muted-foreground">
-                                  {booking.time} - {booking.end} | {booking.court}
-                                </p>
-                                <Badge
-                                  variant="outline"
-                                  className={cn('mt-3 capitalize border bg-white/70', statusStyles[booking.status as keyof typeof statusStyles])}
-                                >
-                                  {booking.status}
-                                </Badge>
-                              </div>
-                            ) : (
-                              <div className="h-full rounded-2xl border border-dashed border-border/60 bg-muted/20 px-4 py-3 text-xs text-muted-foreground">
-                                Disponivel
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  ))}
-                </div>
+                                {booking.status}
+                              </Badge>
+                            </div>
+                          ) : (
+                            <div className="h-full rounded-2xl border border-dashed border-border/60 bg-muted/20 px-4 py-3 text-xs text-muted-foreground">
+                              Disponivel
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                ))}
               </div>
             </div>
-          </CardContent>
-        </Card>
-      </div>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }
