@@ -99,9 +99,10 @@ service cloud.firestore {
       // Allow proprietor to read all their reservations.
       // Allow client to read their own reservations.
       allow get: if isOwner(resource.data.proprietarioId) || isOwner(resource.data.clienteId);
-      // Allow any signed-in user to list reservations. The client queries are already filtered.
-      // This is a temporary measure to fix the proprietor dashboard. Public page might need adjustment.
-      allow list: if isSignedIn();
+      // Allow listing reservations ONLY if the query is filtered by a proprietarioId.
+      // This is crucial for security and performance, preventing reads of the entire collection group.
+      // This rule serves both the proprietor's dashboard and the public booking page.
+      allow list: if 'proprietarioId' in request.query.where;
     }
 
     /**
